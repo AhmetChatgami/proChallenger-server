@@ -1,73 +1,70 @@
-require('dotenv').config()
-const express = require('express')
-const cors = require('cors')
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
 const { MongoClient, ServerApiVersion } = require('mongodb');
-const admin = require('firebase-admin')
-const port = process.env.PORT || 3000
-const decoded = Buffer.from(process.env.FB_SERVICE_KEY, 'base64').toString(
-  'utf-8'
-)
-const serviceAccount = JSON.parse(decoded)
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-})
+const admin = require('firebase-admin');
 
-const app = express()
-// middleware
-app.use(
-  cors({
+const port = process.env.PORT || 3000;
+const app = express();
+
+// 1. Middleware (অবশ্যই সবার আগে থাকতে হবে)
+app.use(cors({
     origin: [
-      'http://localhost:5173',
-      'http://localhost:5174',
-      
+        'http://localhost:5173',
+        'http://localhost:5174',
     ],
     credentials: true,
     optionSuccessStatus: 200,
-  })
-)
-app.use(express.json())
+}));
+app.use(express.json());
 
-// jwt middlewares
-const verifyJWT = async (req, res, next) => {
-  const token = req?.headers?.authorization?.split(' ')[1]
-  console.log(token)
-  if (!token) return res.status(401).send({ message: 'Unauthorized Access!' })
-  try {
-    const decoded = await admin.auth().verifyIdToken(token)
-    req.tokenEmail = decoded.email
-    console.log(decoded)
-    next()
-  } catch (err) {
-    console.log(err)
-    return res.status(401).send({ message: 'Unauthorized Access!', err })
-  }
+// 2. Firebase Admin Setup (Error handle করার জন্য try-catch দেওয়া হলো)
+try {
+    const decoded = Buffer.from(process.env.FB_SERVICE_KEY, 'base64').toString('utf-8');
+    const serviceAccount = JSON.parse(decoded);
+    if (!admin.apps.length) {
+        admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount),
+        });
+    }
+    console.log("Firebase Admin Initialized");
+} catch (error) {
+    console.error("Firebase Initialization Error:", error.message);
 }
 
-// MongoDB URI
-
-// const { MongoClient, ServerApiVersion } = require('mongodb');
+// 3. MongoDB Connection
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.0gdtq1d.mongodb.net/prochallenger?retryWrites=true&w=majority`;
 
-// Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
-  serverApi: {
-    version: ServerApiVersion.v1,
-    strict: true,
-    deprecationErrors: true,
-  }
+    serverApi: {
+        version: ServerApiVersion.v1,
+        strict: true,
+        deprecationErrors: true,
+    }
 });
 
 async function run() {
-  try {
-    // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
-    // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
-  } finally {
+    try {
+        // await client.connect(); 
+        await client.db("admin").command({ ping: 1 });
+        console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    } catch (err) {
+        console.error("MongoDB Connection Error:", err);
+    }
+    finally {
     // Ensures that the client will close when you finish/error
-    await client.close();
+    // await client.close();
   }
+    // note: এখানে client.close() ব্যবহার করবেন না, করলে সার্ভার রিকোয়েস্ট নিতে পারবে না
 }
 run().catch(console.dir);
 
+// 4. Routes (সার্ভার চেক করার জন্য)
+app.get('/', (req, res) => {
+    res.send('ProChallenger Server is running...');
+});
+
+// 5. Server Listen
+app.listen(port, () => {
+    console.log(`Server is running on port: ${port}`);
+});
