@@ -50,6 +50,7 @@ async function run() {
     const db = client.db("prochallengerdb");
     const contestCollection = db.collection("contests");
     const registeredCollection = db.collection("registeredContests");
+    const usersCollection = db.collection("users");
 
     // save contest data in DB
     app.post("/contests", async (req, res) => {
@@ -183,6 +184,14 @@ async function run() {
         "creator.email": email
       }).toArray();
       res.send(result)
+    })
+
+
+    // users controller
+    app.post('user', async(req,res)=>{
+      const userData = req.body
+
+      res.send(userData)
     })
 
 
