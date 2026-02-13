@@ -156,45 +156,50 @@ async function run() {
     });
 
     // get contest by email
-    app.get("/my-contests/:email", async(req, res)=>{
+    app.get("/my-contests/:email", async (req, res) => {
       const email = req.params.email;
 
-      const result= await registeredCollection.find({
-        customer: email
-      }).toArray();
-      res.send(result)
-    })
-   
-    
-  //  manage contest by creator email
-    app.get("/manage-contests/:email", async(req, res)=>{
+      const result = await registeredCollection
+        .find({
+          customer: email,
+        })
+        .toArray();
+      res.send(result);
+    });
+
+    //  manage contest by creator email
+    app.get("/manage-contests/:email", async (req, res) => {
       const email = req.params.email;
 
-      const result= await registeredCollection.find({
-        "creator.email": email
-      }).toArray();
-      res.send(result)
-    })
-   
-  //  manage all contest by creator email
-    app.get("/my-inventory/:email", async(req, res)=>{
+      const result = await registeredCollection
+        .find({
+          "creator.email": email,
+        })
+        .toArray();
+      res.send(result);
+    });
+
+    //  manage all contest by creator email
+    app.get("/my-inventory/:email", async (req, res) => {
       const email = req.params.email;
 
-      const result= await contestCollection.find({
-        "creator.email": email
-      }).toArray();
-      res.send(result)
-    })
-
+      const result = await contestCollection
+        .find({
+          "creator.email": email,
+        })
+        .toArray();
+      res.send(result);
+    });
 
     // users controller
-    app.post('user', async(req,res)=>{
-      const userData = req.body
+    app.post("/user", async (req, res) => {
+      const userData = req.body;
+const result = await usersCollection.insertOne(userData);
+      res.send(result);
+      
+    });
 
-      res.send(userData)
-    })
-
-
+    // send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!",
