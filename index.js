@@ -164,7 +164,7 @@ async function run() {
       res.send(result)
     })
    
-    // managing contest by id API
+    
   //  manage contest by creator email
     app.get("/manage-contests/:email", async(req, res)=>{
       const email = req.params.email;
