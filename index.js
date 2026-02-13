@@ -134,6 +134,7 @@ async function run() {
           category: contest.category,
           quantity: 1,
           price: session.amount_total / 100,
+          image: contest.image,
         };
         console.log("Registration info -->", registerInfo);
         const result = await registeredCollection.insertOne(registerInfo);
@@ -152,6 +153,37 @@ async function run() {
         });
       }
     });
+
+    // get contest by email
+    app.get("/my-contests/:email", async(req, res)=>{
+      const email = req.params.email;
+
+      const result= await registeredCollection.find({
+        customer: email
+      }).toArray();
+      res.send(result)
+    })
+   
+  //  manage contest by creator email
+    app.get("/manage-contests/:email", async(req, res)=>{
+      const email = req.params.email;
+
+      const result= await registeredCollection.find({
+        "creator.email": email
+      }).toArray();
+      res.send(result)
+    })
+   
+  //  manage all contest by creator email
+    app.get("/my-inventory/:email", async(req, res)=>{
+      const email = req.params.email;
+
+      const result= await contestCollection.find({
+        "creator.email": email
+      }).toArray();
+      res.send(result)
+    })
+
 
     await client.db("admin").command({ ping: 1 });
     console.log(
