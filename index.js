@@ -11,7 +11,7 @@ const app = express();
 // 1. Middleware
 app.use(
   cors({
-    origin: ["http://localhost:5173", "http://localhost:5174"],
+    origin: [process.env.CLIENT_DOMAIN],
     credentials: true,
     optionSuccessStatus: 200,
   }),
@@ -49,6 +49,7 @@ async function run() {
   try {
     const db = client.db("prochallengerdb");
     const contestCollection = db.collection("contests");
+    const registeredCollection = db.collection("registeredContests");
 
     // save contest data in DB
     app.post("/contests", async (req, res) => {
@@ -73,7 +74,85 @@ async function run() {
 
     // await client.connect();
 
-    
+    // Payment with Stripe integression
+    //Method -1
+    console.log("Route Hit!");
+    app.post("/create-checkout-session", async (req, res) => {
+      const paymentInfo = req.body;
+      const amount = parseInt(paymentInfo?.price) * 100;
+      console.log(paymentInfo);
+      //   res.send(paymentInfo);
+      const session = await stripe.checkout.sessions.create({
+        line_items: [
+          {
+            price_data: {
+              currency: "usd",
+              unit_amount: amount,
+              product_data: {
+                name: paymentInfo?.name,
+                description: paymentInfo?.description,
+                images: [paymentInfo?.image],
+              },
+            },
+            quantity: paymentInfo?.quantity,
+          },
+        ],
+        customer_email: paymentInfo?.customer?.email,
+        mode: "payment",
+        metadata: {
+          contestId: paymentInfo?.contestId,
+          customer: paymentInfo?.customer.email,
+        },
+        success_url: `${process.env.CLIENT_DOMAIN}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+
+        cancel_url: `${process.env.CLIENT_DOMAIN}/contest/${paymentInfo?.contestId}`,
+      });
+      console.log("Stripe session", session);
+      res.send({ url: session.url });
+    });
+
+    app.post("/payment-success", async (req, res) => {
+      const { sessionId } = req.body;
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
+      console.log("payment success", session);
+      const contest = await contestCollection.findOne({
+        _id: new ObjectId(session.metadata.contestId),
+      });
+
+      const registered = await registeredCollection.findOne({
+        transactionId: session.payment_intent,
+      });
+
+      if (session.status === "complete" && contest && !registered) {
+        const registerInfo = {
+          contestId: session.metadata.contestId,
+          transactionId: session.payment_intent,
+          customer: session.metadata.customer,
+          status: "pending",
+          creator: contest.creator,
+          name: contest.name,
+          category: contest.category,
+          quantity: 1,
+          price: session.amount_total / 100,
+        };
+        console.log("Registration info -->", registerInfo);
+        const result = await registeredCollection.insertOne(registerInfo);
+
+        // update quntity in contest collection
+        await contestCollection.updateOne(
+          {
+            _id: new ObjectId(session.metadata.contestId),
+          },
+          { $inc: { quantity: -1 } },
+        );
+
+        return res.send({
+          transactionId: session.payment_intent,
+          registerId: registered._id,
+        });
+      }
+    });
+
     await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!",
@@ -85,22 +164,7 @@ async function run() {
   }
 }
 run().catch(console.dir);
-// Payment with Stripe integression
-    console.log("Route Hit!")
-    app.post("/create-checkout-session", async (req, res) => {
-      const paymentInfo = req.body;
-      console.log(paymentInfo)
-      res.send(paymentInfo)
-      const session = await stripe.checkout.sessions.create({
-        line_items: [
-          {
-            price: {},
-            quantity: 1,
-          },
-        ],
-        mode: "payment",
-      });
-    });
+
 // 4. Routes
 app.get("/", (req, res) => {
   res.send("ProChallenger Server is running...");
