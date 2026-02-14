@@ -65,6 +65,7 @@ async function run() {
     const contestCollection = db.collection("contests");
     const registeredCollection = db.collection("registeredContests");
     const usersCollection = db.collection("users");
+    const roleRequestsCollection = db.collection('roleRequests')
 
     // save contest data in DB
     app.post("/contests", async (req, res) => {
@@ -235,6 +236,13 @@ async function run() {
       const result = await usersCollection.findOne({ email: req.tokenEmail });
       res.send({ role: result?.role });
     });
+
+    // role request by user
+    app.post('/become-creator', verifyJWT, async(req, res)=>{
+      const email = req.tokenEmail
+      const result = await roleRequestsCollection.insertOne({email})
+      res.send(result)
+    })
 
     // send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
