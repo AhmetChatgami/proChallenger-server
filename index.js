@@ -168,14 +168,13 @@ async function run() {
         });
       }
     });
+    // Paymet integression end
 
     // get contest by email
-    app.get("/my-contests/:email", async (req, res) => {
-      const email = req.params.email;
-
+    app.get("/my-contests", verifyJWT, async (req, res) => {
       const result = await registeredCollection
         .find({
-          customer: email,
+          customer: req.tokenEmail,
         })
         .toArray();
       res.send(result);
