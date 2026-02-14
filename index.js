@@ -67,8 +67,30 @@ async function run() {
     const usersCollection = db.collection("users");
     const roleRequestsCollection = db.collection("roleRequests");
 
+    // role middlewares
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.tokenEmail;
+      const user = await usersCollection.findOne({ email });
+      if (user?.role !== "admin")
+        return res
+          .status(403)
+          .send({ message: "Forbidden Access", role: user?.role });
+      next();
+    };
+
+    const verifySeller = async (req, res, next) => {
+      const email = req.tokenEmail;
+      const user = await usersCollection.findOne({ email });
+      if (user?.role !== "seller")
+        return res
+          .status(403)
+          .send({ message: "Forbidden Access", role: user?.role });
+      next();
+    };
+    // <--- Role middlewares end --->
+
     // save contest data in DB
-    app.post("/contests", async (req, res) => {
+    app.post("/contests", verifyJWT, verifySeller, async (req, res) => {
       const contestData = req.body;
       console.log(contestData);
       const result = await contestCollection.insertOne(contestData);
@@ -182,7 +204,7 @@ async function run() {
     });
 
     //  manage contest by creator email
-    app.get("/manage-contests/:email", async (req, res) => {
+    app.get("/manage-contests/:email", verifyJWT, verifySeller, async (req, res) => {
       const email = req.params.email;
 
       const result = await registeredCollection
@@ -194,7 +216,7 @@ async function run() {
     });
 
     //  manage all contest by creator email
-    app.get("/my-inventory/:email", async (req, res) => {
+    app.get("/my-inventory/:email", verifyJWT, verifySeller, async (req, res) => {
       const email = req.params.email;
 
       const result = await contestCollection
@@ -251,25 +273,30 @@ async function run() {
     });
 
     // get all role requests for admin
-    app.get("/user-requests", verifyJWT, async (req, res) => {
+    app.get("/user-requests", verifyJWT, verifyAdmin, async (req, res) => {
       const result = await roleRequestsCollection.find().toArray();
       res.send(result);
     });
-    
-    
+
     // get all users for admin
-    app.get("/users", verifyJWT, async (req, res) => {
-      const result = await usersCollection.find().toArray();
+    app.get("/users", verifyJWT, verifyAdmin, async (req, res) => {
+      const adminEmail = req.tokenEmail;
+      const result = await usersCollection
+        .find({ email: { $ne: adminEmail } })
+        .toArray();
       res.send(result);
     });
 
     // update user role by admin
-    app.patch('/update-role', verifyJWT, async (req, res)=>{
-      const {email, role} = req.body;
-      const result = await usersCollection.updateOne({email}, {$set: {role}})
-      await roleRequestsCollection.deleteOne({email})
+    app.patch("/update-role", verifyJWT, verifyAdmin, async (req, res) => {
+      const { email, role } = req.body;
+      const result = await usersCollection.updateOne(
+        { email },
+        { $set: { role } },
+      );
+      await roleRequestsCollection.deleteOne({ email });
       res.send(result);
-    })
+    });
 
     // send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
