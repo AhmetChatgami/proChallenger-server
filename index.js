@@ -65,7 +65,7 @@ async function run() {
     const contestCollection = db.collection("contests");
     const registeredCollection = db.collection("registeredContests");
     const usersCollection = db.collection("users");
-    const roleRequestsCollection = db.collection('roleRequests')
+    const roleRequestsCollection = db.collection("roleRequests");
 
     // save contest data in DB
     app.post("/contests", async (req, res) => {
@@ -238,14 +238,29 @@ async function run() {
     });
 
     // role request by user
-    app.post('/become-creator', verifyJWT, async(req, res)=>{
-      const email = req.tokenEmail
-      const existingRequest = await roleRequestsCollection.findOne({email})
-      if(existingRequest){
-        return res.status(400).send({message: "You have already sent a request."})
+    app.post("/become-creator", verifyJWT, async (req, res) => {
+      const email = req.tokenEmail;
+      const existingRequest = await roleRequestsCollection.findOne({ email });
+      if (existingRequest) {
+        return res
+          .status(400)
+          .send({ message: "You have already sent a request." });
       }
-      const result = await roleRequestsCollection.insertOne({email})
-      res.send(result)
+      const result = await roleRequestsCollection.insertOne({ email });
+      res.send(result);
+    });
+
+    // get all role requests for admin
+    app.get("/user-requests", verifyJWT, async (req, res) => {
+      const result = await roleRequestsCollection.find().toArray();
+      res.send(result);
+    });
+
+    // update user role by admin
+    app.path('/update-role', verifyJWT, async (req, res)=>{
+      const {email, role} = req.body;
+      const result = await usersCollection.updateOne({email}, {$set: role})
+      await roleRequestsCollection.deleteOne({email})
     })
 
     // send a ping to confirm a successful connection
