@@ -240,6 +240,10 @@ async function run() {
     // role request by user
     app.post('/become-creator', verifyJWT, async(req, res)=>{
       const email = req.tokenEmail
+      const existingRequest = await roleRequestsCollection.findOne({email})
+      if(existingRequest){
+        return res.status(400).send({message: "You have already sent a request."})
+      }
       const result = await roleRequestsCollection.insertOne({email})
       res.send(result)
     })
