@@ -18,6 +18,20 @@ app.use(
 );
 app.use(express.json());
 
+// JWT Middleware
+const verifyJWT = async (req, res, next) => {
+  const token = req?.headers?.authorization?.split(" ")[1];
+  if (!token) return res.status(401).send({ message: "Unauthorized access!" });
+  try {
+    const decoded = await admin.auth().verifyIdToken(token);
+    req.tokenEmail = decoded.email;
+    next();
+  } catch (err) {
+    console.log(err);
+    return res.status(401).send({ message: "Unauthorized access!", err });
+  }
+};
+
 // 2. Firebase Admin Setup (try-catch for error handling)
 try {
   const decoded = Buffer.from(process.env.FB_SERVICE_KEY, "base64").toString(
@@ -191,12 +205,12 @@ async function run() {
       res.send(result);
     });
 
-    // users controller
+    // Save or Update- users controller
     app.post("/user", async (req, res) => {
       const userData = req.body;
       userData.created_at = new Date().toISOString();
       userData.last_login = new Date().toISOString();
-      userData.role = 'customer';
+      userData.role = "customer";
 
       const query = { email: userData.email };
 
@@ -217,12 +231,11 @@ async function run() {
       res.send(result);
     });
 
-    // get user role 
-    app.get('/user/role/:email', async (req, res)=>{
-      const email = req.params.email;
-      const result = await usersCollection.findOne({email})
-      res.send({role: result?.role})
-    })
+    // get user role
+    app.get("/user/role", verifyJWT, async (req, res) => {
+      const result = await usersCollection.findOne({ email: req.tokenEmail });
+      res.send({ role: result?.role });
+    });
 
     // send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
