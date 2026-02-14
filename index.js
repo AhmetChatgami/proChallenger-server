@@ -255,12 +255,20 @@ async function run() {
       const result = await roleRequestsCollection.find().toArray();
       res.send(result);
     });
+    
+    
+    // get all users for admin
+    app.get("/users", verifyJWT, async (req, res) => {
+      const result = await usersCollection.find().toArray();
+      res.send(result);
+    });
 
     // update user role by admin
-    app.path('/update-role', verifyJWT, async (req, res)=>{
+    app.patch('/update-role', verifyJWT, async (req, res)=>{
       const {email, role} = req.body;
-      const result = await usersCollection.updateOne({email}, {$set: role})
+      const result = await usersCollection.updateOne({email}, {$set: {role}})
       await roleRequestsCollection.deleteOne({email})
+      res.send(result);
     })
 
     // send a ping to confirm a successful connection
