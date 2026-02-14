@@ -194,9 +194,27 @@ async function run() {
     // users controller
     app.post("/user", async (req, res) => {
       const userData = req.body;
-const result = await usersCollection.insertOne(userData);
+      userData.created_at = new Date().toISOString();
+      userData.last_login = new Date().toISOString();
+      userData.role = 'customer';
+
+      const query = { email: userData.email };
+
+      const existingUser = await usersCollection.findOne(query);
+
+      if (existingUser) {
+        const result = await usersCollection.updateOne(query, {
+          $set: {
+            last_login: new Date().toISOString(),
+            name: userData.name,
+            image: userData.image,
+          },
+        });
+        return res.send(result);
+      }
+
+      const result = await usersCollection.insertOne(userData);
       res.send(result);
-      
     });
 
     // send a ping to confirm a successful connection
