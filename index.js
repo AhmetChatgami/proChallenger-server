@@ -81,7 +81,7 @@ async function run() {
     const verifySeller = async (req, res, next) => {
       const email = req.tokenEmail;
       const user = await usersCollection.findOne({ email });
-      if (user?.role !== "seller")
+      if (user?.role !== "creator")
         return res
           .status(403)
           .send({ message: "Forbidden Access", role: user?.role });
@@ -149,51 +149,98 @@ async function run() {
       res.send({ url: session.url });
     });
 
-    app.post("/payment-success", async (req, res) => {
-      const { sessionId } = req.body;
-      const session = await stripe.checkout.sessions.retrieve(sessionId);
-      console.log("payment success", session);
-      const contest = await contestCollection.findOne({
-        _id: new ObjectId(session.metadata.contestId),
-      });
+    // app.post("/payment-success", async (req, res) => {
+    //   const { sessionId } = req.body;
+    //   const session = await stripe.checkout.sessions.retrieve(sessionId);
+    //   console.log("payment success", session);
+    //   const contest = await contestCollection.findOne({
+    //     _id: new ObjectId(session.metadata.contestId),
+    //   });
 
-      const registered = await registeredCollection.findOne({
-        transactionId: session.payment_intent,
-      });
+    //   const registered = await registeredCollection.findOne({
+    //     transactionId: session.payment_intent,
+    //   });
 
-      if (session.status === "complete" && contest && !registered) {
-        const registerInfo = {
-          contestId: session.metadata.contestId,
-          transactionId: session.payment_intent,
-          customer: session.metadata.customer,
-          status: "pending",
-          creator: contest.creator,
-          name: contest.name,
-          category: contest.category,
-          quantity: 1,
-          price: session.amount_total / 100,
-          image: contest.image,
-        };
-        console.log("Registration info -->", registerInfo);
-        const result = await registeredCollection.insertOne(registerInfo);
+    //   if (session.status === "complete" && contest && !registered) {
+    //     const registerInfo = {
+    //       contestId: session.metadata.contestId,
+    //       transactionId: session.payment_intent,
+    //       customer: session.metadata.customer,
+    //       status: "pending",
+    //       creator: contest.creator,
+    //       name: contest.name,
+    //       category: contest.category,
+    //       quantity: 1,
+    //       price: session.amount_total / 100,
+    //       image: contest.image,
+    //     };
+    //     console.log("Registration info -->", registerInfo);
+    //     const result = await registeredCollection.insertOne(registerInfo);
 
-        // update quntity in contest collection
-        await contestCollection.updateOne(
-          {
-            _id: new ObjectId(session.metadata.contestId),
-          },
-          { $inc: { quantity: -1 } },
-        );
+    //     // update quntity in contest collection
+    //     await contestCollection.updateOne(
+    //       {
+    //         _id: new ObjectId(session.metadata.contestId),
+    //       },
+    //       { $inc: { quantity: -1 } },
+    //     );
 
-        return res.send({
-          transactionId: session.payment_intent,
-          registerId: registered._id,
-        });
-      }
-    });
+    //     return res.send({
+    //       transactionId: session.payment_intent,
+    //       registerId: registered._id,
+    //     });
+    //   }
+    // });
     // Paymet integression end
 
     // get contest by email
+   
+   app.post("/payment-success", async (req, res) => {
+  const { sessionId } = req.body;
+  const session = await stripe.checkout.sessions.retrieve(sessionId);
+  
+  const contestId = session.metadata.contestId;
+  const customerEmail = session.metadata.customer;
+
+  const contest = await contestCollection.findOne({
+    _id: new ObjectId(contestId),
+  });
+
+  const registered = await registeredCollection.findOne({
+    transactionId: session.payment_intent,
+  });
+
+  if (session.status === "complete" && contest && !registered) {
+    const registerInfo = {
+      contestId: contestId,
+      transactionId: session.payment_intent,
+      customer: customerEmail,
+      status: "pending",
+      creator: contest.creator,
+      name: contest.name,
+      category: contest.category,
+      price: session.amount_total / 100,
+      image: contest.image,
+      paymentDate: new Date(), 
+    };
+
+    const result = await registeredCollection.insertOne(registerInfo);
+
+    
+    await contestCollection.updateOne(
+      { _id: new ObjectId(contestId) },
+      { 
+        $inc: { participantsCount: 1 } 
+      }
+    );
+
+    return res.send({
+      transactionId: session.payment_intent,
+      success: true,
+    });
+  }
+});
+   
     app.get("/my-contests", verifyJWT, async (req, res) => {
       const result = await registeredCollection
         .find({
